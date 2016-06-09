@@ -56,4 +56,22 @@ class Image extends \yii\db\ActiveRecord
             'updateTime' => 'Update Time',
         ];
     }
+
+    public function getTags()
+    {
+        return $this->hasMany(Tag::className(), ['id' => 'tagId'])
+            ->viaTable('image_tag', ['imageId' => 'id']);
+    }
+
+    public static function getUrlFromResizedFilePath($filePath)
+    {
+        $tmp = explode('output', $filePath);
+        return $tmp[1];
+    }
+
+    public static function getUrlFromRawFilePath($filePath)
+    {
+        $tmp = explode('homeNASDownloads', $filePath);
+        return $tmp[1];
+    }
 }

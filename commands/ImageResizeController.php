@@ -11,6 +11,7 @@ namespace app\commands;
 use Yii;
 use yii\console\Controller;
 use Intervention\Image\ImageManagerStatic as Image;
+use Intervention\Image\Exception\NotReadableException;
 
 
 class ImageResizeController extends Controller
@@ -18,10 +19,18 @@ class ImageResizeController extends Controller
     /**
      * 为图片生成信息
      */
-    public function actionInit()
+    public function actionInit($rootPath = '')
     {
+        Yii::beginProfile(__METHOD__);
 
-        $imageRootPath = Yii::$app->params['rootPath'];
+        ini_set('memory_limit', '512M');
+
+        if(!empty($rootPath)) {
+            //归一化路径
+            $rootPath = preg_replace('/\/+$/', '', $rootPath);
+        }
+
+        $imageRootPath = !empty($rootPath) ? $rootPath : Yii::$app->params['rootPath'];
         $outputPath = Yii::$app->params['outputPath'];
         $resizeWidth = Yii::$app->params['resizeWidth'];
         $thumbnailWidth = Yii::$app->params['thumbnailWidth'];
@@ -32,7 +41,7 @@ class ImageResizeController extends Controller
 
         foreach ($filePathList as $filePath) {
 
-            Yii::trace('mem usage:'.(round(memory_get_usage(true)/1024/1024, 2)).' MB');
+            Yii::trace('mem usage:'.(round(memory_get_usage()/1024/1024, 2)).' MB');
 
             if($this->isResized($filePath)) {
                 Yii::trace('this image is resized:'.$filePath);
@@ -41,14 +50,32 @@ class ImageResizeController extends Controller
 
             $resizeFilePath = $this->getFilePath($outputPath, $filePath, $resizeWidth);
             $thumbnailFilePath = $this->getFilePath($outputPath, $filePath, $thumbnailWidth);
-            $exif = Image::make($filePath)->exif();
-            Image::make($filePath)->resize($resizeWidth, null, function ($constraint) {
-                $constraint->aspectRatio();
-            })->save($resizeFilePath);
 
-            Image::make($filePath)->resize($thumbnailWidth, null, function ($constraint) {
-                $constraint->aspectRatio();
-            })->save($thumbnailFilePath);
+            try {
+                $imageMake = Image::make($filePath);
+                $exif = $imageMake->exif();
+                $imageMake->destroy();
+
+                $imageMake = Image::make($filePath);
+                $imageMake->resize($resizeWidth, null, function ($constraint) {
+                    $constraint->aspectRatio();
+                })->save($resizeFilePath);
+                $imageMake->destroy();
+
+                $imageMake = Image::make($filePath);
+                $imageMake->resize($thumbnailWidth, null, function ($constraint) {
+                    $constraint->aspectRatio();
+                })->save($thumbnailFilePath);
+
+                $imageMake->destroy();
+
+                $imageMake = null;
+            }catch (NotReadableException $e) {
+                Yii::error($e->getMessage().' filepath:'.$filePath);
+                continue;
+            }
+
+
 
 
             $image = new \app\models\Image();
@@ -66,6 +93,7 @@ class ImageResizeController extends Controller
         }
 
 
+        Yii::endProfile(__METHOD__);
     }
 
     public function actionTestIsResized($rawFilePath)
@@ -155,5 +183,22 @@ class ImageResizeController extends Controller
 
 
         return $filePathList;
+    }
+
+    public function actionImportDump()
+    {
+        $command = Yii::$app->db_dump->createCommand('select * from image');
+        $dumpList = $command->queryAll();
+
+        foreach ($dumpList as $dumpImage) {
+            $image = new \app\models\Image();
+            $image->filePath = $dumpImage['filePath'];
+            $image->thumbnailFilePath = $dumpImage['thumbnailFilePath'];
+            $image->rawFilePath = $dumpImage['rawFilePath'];
+            $image->createTime = $dumpImage['createTime'];
+            $image->updateTime = $dumpImage['updateTime'];
+            $image->exif = $dumpImage['exif'];
+            $image->save();
+        }
     }
 }

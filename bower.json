@@ -1,0 +1,25 @@
+{
+  "name": "photo_gallery",
+  "homepage": "https://github.com/tomjamescn/photo_gallery",
+  "authors": [
+    "tomjamescn <tomjamescn@gmail.com>"
+  ],
+  "description": "",
+  "main": "",
+  "moduleType": [],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "vendor/bower",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "masonry": "~3.3.2",
+    "SpinKit": "spinkit#~1.2.5",
+    "swipebox": "~1.4.1"
+  }
+}
